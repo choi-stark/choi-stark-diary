@@ -9,7 +9,7 @@ import random
 # 페이지 설정
 st.set_page_config(page_title="미라클 다이어리", layout="wide")
 
-# 1. 스타일 설정
+# 1. 스타일 설정 (달력 동그라미 표기 및 버튼 커스텀)
 st.markdown("""
     <style>
     .fc-daygrid-event { border-radius: 50% !important; width: 14px !important; height: 14px !important; margin: 2px auto !important; background-color: #FF0000 !important; border: none !important; }
@@ -29,29 +29,32 @@ else:
     st.stop()
 
 def get_data():
-    try: return conn.read(worksheet="Sheet1")
-    except: return pd.DataFrame(columns=["날짜", "감사1", "감사2", "감사3", "확언1", "확언2", "확언3", "이미지URL", "의미"])
+    try:
+        # 시트에서 데이터를 읽어옵니다.
+        return conn.read(worksheet="Sheet1")
+    except:
+        # 데이터가 없거나 오류 시 빈 데이터프레임 생성
+        return pd.DataFrame(columns=["날짜", "감사1", "감사2", "감사3", "확언1", "확언2", "확언3", "이미지URL", "의미"])
 
 df = get_data()
 
 # AI 페르소나 설정
 def ask_gemini(prompt):
-    system_instruction = "당신은 사용자의 인생 멘토입니다. 말투는 매우 단호하고 확신에 차 있어야 하며, 결의의 메시지를 2~3문장으로 작성하세요."
+    system_instruction = "당신은 인생 멘토입니다. 매우 단호하고 확신에 찬 어조로 2~3문장의 결의 메시지를 작성하세요."
     try:
         response = model.generate_content(f"{system_instruction}\n\n내용: {prompt}")
         return response.text
     except:
-        return "오늘 하루를 당신의 것으로 만드십시오."
+        return "당신의 의지가 현실을 창조합니다. 오늘 하루를 당신의 것으로 만드십시오."
 
 # 세션 상태 초기화
 if 'step' not in st.session_state: st.session_state.step = 1
 
-tab1, tab2 = st.tabs(["오늘의 결의 작성", "지난 결의 기록"])
+# --- 탭 이름 수정 (요청사항 반영) ---
+tab1, tab2 = st.tabs(["오늘의 일기작성", "지난 기록"])
 
 # ---------------- Tab 1: 일기 작성 ----------------
 with tab1:
-    # --- 제목 문구(st.title)를 제거했습니다 ---
-    
     if st.session_state.step == 1:
         st.header("🙏 1단계: 감사일기 작성")
         g1 = st.text_input("오늘 감사한 일 1", key="g1")
@@ -87,7 +90,7 @@ with tab1:
         img_url = f"https://picsum.photos/seed/{random.randint(1,9999)}/1200/600"
         st.image(img_url, use_container_width=True)
         
-        meaning = ask_gemini(f"이미지({img_url})의 우주적 의미를 한 줄로 설명해줘.")
+        meaning = ask_gemini(f"이 사진({img_url})의 우주적 의미를 본부장님의 결의와 연결해 한 줄로 설명해줘.")
         st.write(f"💡 이미지의 의미: {meaning}")
         
         if st.button("최종 기록 제출"):
@@ -103,16 +106,42 @@ with tab1:
             st.session_state.step = 1
             st.rerun()
 
-# ---------------- Tab 2: 달력 ----------------
+# ---------------- Tab 2: 지난 기록 (달력 보완) ----------------
 with tab2:
-    calendar_events = [{"title": "●", "start": str(row["날짜"]), "end": str(row["날짜"]), "display": "background", "color": "rgba(255, 0, 0, 0.3)"} for _, row in df.iterrows()]
-    state = calendar(events=calendar_events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth"}, "initialView": "dayGridMonth", "height": 700}, key='miracle_calendar')
+    st.header("📅 지난 결의 기록")
     
-    if state.get("callback") == "dateClick":
-        clicked_date = state["dateClick"]["dateStr"]
-        day_data = df[df["날짜"] == clicked_date]
-        if not day_data.empty:
-            st.markdown(f"### 🗓️ {clicked_date}의 기록")
-            st.write(f"🙏 감사: {day_data.iloc[0]['감사1']}, {day_data.iloc[0]['감사2']}, {day_data.iloc[0]['감사3']}")
-            st.write(f"✨ 확언: {day_data.iloc[0]['확언1']}, {day_data.iloc[0]['확언2']}, {day_data.iloc[0]['확언3']}")
-            st.image(day_data.iloc[0]['이미지URL'])
+    # 1. 기록이 있는지 먼저 확인
+    if df.empty or len(df) == 0:
+        st.info("아직 작성된 일기가 없습니다. 첫 일기를 작성해 보세요!")
+    else:
+        # 2. 달력 이벤트 생성 (데이터가 있을 때만)
+        calendar_events = []
+        for _, row in df.iterrows():
+            calendar_events.append({
+                "title": "●",
+                "start": str(row["날짜"]),
+                "end": str(row["날짜"]),
+                "display": "background",
+                "color": "rgba(255, 0, 0, 0.3)"
+            })
+
+        # 3. 달력 표시
+        state = calendar(
+            events=calendar_events, 
+            options={
+                "headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth"},
+                "initialView": "dayGridMonth",
+                "height": 700
+            }, 
+            key='miracle_calendar_v2' # 키를 변경하여 강제 렌더링
+        )
+        
+        # 4. 날짜 클릭 시 상세 내용 표시
+        if state.get("callback") == "dateClick":
+            clicked_date = state["dateClick"]["dateStr"]
+            day_data = df[df["날짜"] == clicked_date]
+            if not day_data.empty:
+                st.markdown(f"### 🗓️ {clicked_date}의 기록")
+                st.write(f"🙏 감사: {day_data.iloc[0]['감사1']}, {day_data.iloc[0]['감사2']}, {day_data.iloc[0]['감사3']}")
+                st.write(f"✨ 확언: {day_data.iloc[0]['확언1']}, {day_data.iloc[0]['확언2']}, {day_data.iloc[0]['확언3']}")
+                st.image(day_data.iloc[0]['이미지URL'])

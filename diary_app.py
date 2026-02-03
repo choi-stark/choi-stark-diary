@@ -7,7 +7,7 @@ import google.generativeai as genai
 import random
 
 # 페이지 설정
-st.set_page_config(page_title="최본부장님의 결의 다이어리", layout="wide")
+st.set_page_config(page_title="미라클 다이어리", layout="wide")
 
 # 1. 스타일 설정
 st.markdown("""
@@ -21,7 +21,6 @@ st.markdown("""
 # 2. API 및 연결 설정
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Secrets에 gemini_api_key가 있는지 확인
 if "gemini_api_key" in st.secrets:
     genai.configure(api_key=st.secrets["gemini_api_key"])
     model = genai.GenerativeModel('gemini-1.5-flash')
@@ -37,12 +36,12 @@ df = get_data()
 
 # AI 페르소나 설정
 def ask_gemini(prompt):
-    system_instruction = "당신은 '최본부장님'의 인생 멘토입니다. 말투는 매우 단호하고 확신에 차 있어야 하며, '하루는 당신의 것'임을 강조하는 결의의 메시지를 2~3문장으로 작성하세요."
+    system_instruction = "당신은 사용자의 인생 멘토입니다. 말투는 매우 단호하고 확신에 차 있어야 하며, 결의의 메시지를 2~3문장으로 작성하세요."
     try:
         response = model.generate_content(f"{system_instruction}\n\n내용: {prompt}")
         return response.text
     except:
-        return "우주의 기운이 당신을 향하고 있습니다. 오늘 하루를 당신의 것으로 만드십시오."
+        return "오늘 하루를 당신의 것으로 만드십시오."
 
 # 세션 상태 초기화
 if 'step' not in st.session_state: st.session_state.step = 1
@@ -51,11 +50,10 @@ tab1, tab2 = st.tabs(["오늘의 결의 작성", "지난 결의 기록"])
 
 # ---------------- Tab 1: 일기 작성 ----------------
 with tab1:
-    st.title("🔥 최본부장님의 결의 다이어리 (AI)")
-
+    # --- 제목 문구(st.title)를 제거했습니다 ---
+    
     if st.session_state.step == 1:
         st.header("🙏 1단계: 감사일기 작성")
-        # --- 수정된 61번 줄 (오타 해결) ---
         g1 = st.text_input("오늘 감사한 일 1", key="g1")
         g2 = st.text_input("오늘 감사한 일 2", key="g2")
         g3 = st.text_input("오늘 감사한 일 3", key="g3")
@@ -89,7 +87,7 @@ with tab1:
         img_url = f"https://picsum.photos/seed/{random.randint(1,9999)}/1200/600"
         st.image(img_url, use_container_width=True)
         
-        meaning = ask_gemini(f"이 사진({img_url})이 본부장님의 결의와 어떤 우주적 의미가 있는지 한 줄로 설명해줘.")
+        meaning = ask_gemini(f"이미지({img_url})의 우주적 의미를 한 줄로 설명해줘.")
         st.write(f"💡 이미지의 의미: {meaning}")
         
         if st.button("최종 기록 제출"):
@@ -114,7 +112,7 @@ with tab2:
         clicked_date = state["dateClick"]["dateStr"]
         day_data = df[df["날짜"] == clicked_date]
         if not day_data.empty:
-            st.markdown(f"### 🗓️ {clicked_date}의 결의")
+            st.markdown(f"### 🗓️ {clicked_date}의 기록")
             st.write(f"🙏 감사: {day_data.iloc[0]['감사1']}, {day_data.iloc[0]['감사2']}, {day_data.iloc[0]['감사3']}")
             st.write(f"✨ 확언: {day_data.iloc[0]['확언1']}, {day_data.iloc[0]['확언2']}, {day_data.iloc[0]['확언3']}")
             st.image(day_data.iloc[0]['이미지URL'])

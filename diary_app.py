@@ -1,67 +1,58 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
-from streamlit_calendar import calendar
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="GEVIS 다이어리", layout="wide")
+st.set_page_config(page_title="최본부장님의 감사 & 확언 일기", layout="centered")
 
-# 1. 구글 스프레드시트 연결 (서비스 계정 자동 적용)
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(worksheet="Sheet1", ttl=0)
-    st.sidebar.success("✅ 구글 시트 연결 성공!")
-except Exception as e:
-    st.sidebar.error("❌ 연결 확인 필요")
-    st.sidebar.write(f"오류: {e}")
-    df = pd.DataFrame(columns=["날짜", "제목", "내용", "작성시간"])
+st.title("✍️ 오늘의 감사 & 확언 일기")
+st.write(f"날짜: {datetime.now().strftime('%Y-%m-%d')}")
 
-# --- CSS: 기록 있는 날 연한 초록색 동그라미 ---
-st.markdown("""
-    <style>
-    .fc-daygrid-event {
-        background-color: rgba(144, 238, 144, 0.7) !important;
-        border-radius: 50% !important;
-        width: 24px !important; height: 24px !important;
-        margin: 0 auto !important; margin-top: -22px !important;
-        z-index: 0 !important;
-    }
-    .fc-event-main { display: none !important; }
-    .fc-daygrid-day-number { position: relative !important; z-index: 1 !important; }
-    </style>
-    """, unsafe_allow_html=True)
+# 구글 시트 연결
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-menu = st.sidebar.selectbox("메뉴", ["일기 쓰기", "지난 기록 보기"])
+# 1. 감사 일기 섹션
+st.header("🙏 감사 일기 (3가지)")
+g1 = st.text_input("1. 첫 번째 감사한 일")
+g2 = st.text_input("2. 두 번째 감사한 일")
+g3 = st.text_input("3. 세 번째 감사한 일")
 
-if menu == "일기 쓰기":
-    st.title("📝 오늘을 기록하세요")
-    with st.form("diary_form", clear_on_submit=True):
-        date = st.date_input("날짜", datetime.now())
-        title = st.text_input("제목")
-        content = st.text_area("내용", height=200)
-        submit = st.form_submit_button("구글 시트에 저장")
+if g1 or g2 or g3:
+    st.info("💡 제비스의 코멘트: 작은 감사함이 모여 본부장님의 하루를 더 풍요롭게 만들 거예요!")
 
-        if submit and title and content:
-            new_row = pd.DataFrame([{
-                "날짜": date.strftime("%Y-%m-%d"),
-                "제목": title,
-                "내용": content,
-                "작성시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }])
-            updated_df = pd.concat([df, new_row], ignore_index=True)
-            conn.update(worksheet="Sheet1", data=updated_df)
-            st.success("🎉 데이터베이스에 안전하게 보관되었습니다!")
-            st.balloons()
-            st.rerun()
+# 2. 확언 일기 섹션
+st.header("✨ 확언 일기 (3가지)")
+a1 = st.text_input("1. 첫 번째 확언")
+a2 = st.text_input("2. 두 번째 확언")
+a3 = st.text_input("3. 세 번째 확언")
 
-elif menu == "지난 기록 보기":
-    st.title("📅 나의 활동 달력")
-    if not df.empty:
-        df['날짜'] = pd.to_datetime(df['날짜'], errors='coerce').dt.strftime('%Y-%m-%d')
-        recorded_dates = df['날짜'].dropna().unique()
-        events = [{"start": d, "end": d, "display": "block"} for d in recorded_dates]
-        calendar(events=events, options={"initialView": "dayGridMonth"})
-        st.divider()
-        st.dataframe(df.sort_values("날짜", ascending=False), use_container_width=True)
+if a1 or a2 or a3:
+    st.success("💡 제비스의 코멘트: 본부장님은 이미 말씀하신 대로 되어가고 계십니다. 응원합니다!")
+
+# 3. 사진 업로드
+st.header("📸 오늘의 사진")
+uploaded_file = st.file_uploader("오늘을 기억할 사진 한 장을 올려주세요", type=['png', 'jpg', 'jpeg'])
+if uploaded_file:
+    st.image(uploaded_file, caption="업로드된 사진", use_container_width=True)
+
+# 4. 저장 버튼
+if st.button("오늘의 일기 저장하기"):
+    if not (g1 and g2 and g3 and a1 and a2 and a3):
+        st.warning("모든 항목을 작성해 주세요!")
     else:
-        st.info("기록된 데이터가 없습니다.")
+        # 데이터 정리
+        new_data = pd.DataFrame([{
+            "날짜": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "감사1": g1, "감사2": g2, "감사3": g3,
+            "확언1": a1, "확언2": a2, "확언3": a3,
+            "사진여부": "Yes" if uploaded_file else "No"
+        }])
+        
+        # 기존 데이터 읽기 및 추가
+        existing_data = conn.read(worksheet="Sheet1")
+        updated_df = pd.concat([existing_data, new_data], ignore_index=True)
+        
+        # 시트에 저장
+        conn.update(worksheet="Sheet1", data=updated_df)
+        st.balloons()
+        st.success("시트에 성공적으로 기록되었습니다! 수고하셨습니다, 본부장님.")

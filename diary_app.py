@@ -7,71 +7,28 @@ import google.generativeai as genai
 import random
 import time
 
-# 1. 페이지 설정 (아이콘 추가)
+# 1. 페이지 설정
 st.set_page_config(page_title="미라클 다이어리", page_icon="✨", layout="wide")
 
-# 2. ✨ [디자인 업그레이드] 커스텀 CSS 적용
+# 2. 스타일 설정 (디자인 유지)
 st.markdown("""
     <style>
-    /* 전체 폰트 및 배경 느낌 */
-    .stApp {
-        background-color: #F8F9FA;
-    }
-    /* 버튼 스타일링 */
+    .stApp { background-color: #F8F9FA; }
     .stButton>button { 
-        width: 100%; 
-        border-radius: 15px; 
-        font-weight: bold; 
-        height: 3.5em; 
-        background-color: #FFFFFF;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        border: 1px solid #E0E0E0;
-        transition: all 0.3s;
+        width: 100%; border-radius: 15px; font-weight: bold; height: 3.5em; 
+        background-color: #FFFFFF; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #E0E0E0;
     }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0,0,0,0.15);
-        background-color: #F0F2F6;
+    .stButton>button:hover { transform: translateY(-2px); background-color: #F0F2F6; }
+    /* AI 코멘트 박스 */
+    .stSuccess, .stInfo { 
+        border-radius: 15px; border-left: 8px solid #FF6B6B; 
+        background-color: #FFFFFF; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size: 1.1em;
     }
-    /* AI 코멘트 박스 (예쁘게) */
-    .stSuccess { 
-        border-radius: 15px;
-        border-left: 8px solid #FF6B6B; 
-        background-color: #FFFFFF; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        font-size: 1.1em;
-    }
-    /* 달력 커스텀 (모서리 둥글게, 그림자) */
-    .fc {
-        background-color: white;
-        padding: 20px;
-        border-radius: 20px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-        border: none;
-    }
-    .fc-toolbar-title {
-        font-size: 1.5em !important;
-        font-family: 'Helvetica Neue', sans-serif;
-        color: #333;
-    }
-    .fc-col-header-cell {
-        background-color: #F8F9FA;
-        padding: 10px 0 !important;
-        border: none !important;
-    }
-    .fc-daygrid-day {
-        border: 1px solid #F0F0F0 !important;
-    }
-    /* 달력 점(Event) 스타일 */
-    .fc-event {
-        cursor: pointer;
-        border: none !important;
-        background-color: transparent !important;
-    }
-    .fc-daygrid-event-dot {
-        border: 4px solid #FF6B6B !important; /* 빨간 점 */
-        border-radius: 50%;
-    }
+    /* 달력 커스텀 */
+    .fc { background-color: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: none; }
+    .fc-toolbar-title { font-size: 1.5em !important; color: #333; }
+    .fc-event { cursor: pointer; border: none !important; background-color: transparent !important; }
+    .fc-daygrid-event-dot { border: 4px solid #FF6B6B !important; border-radius: 50%; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -98,15 +55,16 @@ def get_data():
 # AI 멘트 요청
 def ask_gemini(prompt):
     try:
-        response = model.generate_content(f"당신은 따뜻하면서도 통찰력 있는 멘토입니다. 본부장님의 글을 보고 2문장으로 피드백해주세요: {prompt}")
+        response = model.generate_content(f"당신은 따뜻한 인생 멘토입니다. 2문장으로 답해주세요: {prompt}")
         return response.text
     except:
-        return "당신의 긍정적인 에너지가 우주를 움직이고 있습니다."
+        return "당신의 긍정이 우주를 움직입니다."
 
 # 세션 상태 초기화
 if 'step' not in st.session_state: st.session_state.step = 1
 if 'cal_key' not in st.session_state: st.session_state.cal_key = 100
 if 'img_seed' not in st.session_state: st.session_state.img_seed = random.randint(1, 9999)
+if 'img_meaning' not in st.session_state: st.session_state.img_meaning = "" # 이미지 의미 저장소
 
 tab1, tab2 = st.tabs(["✍️ 오늘의 다이어리", "📅 지난 기록 모음"])
 
@@ -115,13 +73,13 @@ with tab1:
     # 1단계: 감사일기
     if st.session_state.step == 1:
         st.markdown("### 🌸 오늘 하루, 무엇이 감사했나요?")
-        g1 = st.text_input("감사한 일 1", placeholder="예: 아침에 마신 커피가 맛있었다.", key="g1")
-        g2 = st.text_input("감사한 일 2", placeholder="예: 지하철을 바로 탔다.", key="g2")
-        g3 = st.text_input("감사한 일 3", placeholder="예: 팀원들이 웃어주었다.", key="g3")
+        g1 = st.text_input("감사한 일 1", key="g1")
+        g2 = st.text_input("감사한 일 2", key="g2")
+        g3 = st.text_input("감사한 일 3", key="g3")
         
         if st.button("AI에게 감사 전송 ✨"):
             if g1 and g2 and g3:
-                with st.spinner('제미나이가 본부장님의 감사를 음미하는 중...'):
+                with st.spinner('제미나이가 감사를 읽고 있습니다...'):
                     st.session_state.g_comment = ask_gemini(f"감사내용: {g1}, {g2}, {g3}")
                     st.session_state.g_data = [g1, g2, g3]
                     st.session_state.step = 2
@@ -129,36 +87,44 @@ with tab1:
 
     # 2단계: 확언일기
     elif st.session_state.step == 2:
-        # 💬 AI 코멘트 복구 완료 (박스 디자인 적용)
         st.success(f"🤖 **Gemini's Insight**\n\n{st.session_state.g_comment}")
         
-        st.markdown("### 🔥 내일의 나를 위한 강력한 확언")
-        a1 = st.text_input("확언 1", placeholder="나는 날마다 모든 면에서 성장하고 있다.", key="a1")
-        a2 = st.text_input("확언 2", placeholder="내 안에는 무한한 잠재력이 있다.", key="a2")
-        a3 = st.text_input("확언 3", placeholder="나는 풍요를 누릴 자격이 있다.", key="a3")
+        st.markdown("### 🔥 내일의 나를 위한 확언")
+        a1 = st.text_input("확언 1", key="a1")
+        a2 = st.text_input("확언 2", key="a2")
+        a3 = st.text_input("확언 3", key="a3")
         
         if st.button("확언 선포하기 🚀"):
             if a1 and a2 and a3:
-                with st.spinner('우주의 에너지를 연결하는 중...'):
+                with st.spinner('확신을 우주에 새기는 중...'):
                     st.session_state.a_comment = ask_gemini(f"확언내용: {a1}, {a2}, {a3}")
                     st.session_state.a_data = [a1, a2, a3]
                     st.session_state.step = 3
                     st.rerun()
 
-    # 3단계: 최종 확인
+    # 3단계: 최종 확인 (이미지 해석 기능 복구됨)
     elif st.session_state.step == 3:
         st.success(f"💫 **Universal Response**\n\n{st.session_state.a_comment}")
         
         st.markdown("### 🖼️ 오늘의 에너지 이미지")
         img_url = f"https://picsum.photos/seed/{st.session_state.img_seed}/1200/600"
-        st.image(img_url, use_container_width=True, caption="Today's Random Inspiration")
+        st.image(img_url, use_container_width=True)
+        
+        # 🟢 [복구된 기능] 이미지 의미 해석 생성 및 표시
+        if not st.session_state.img_meaning:
+            with st.spinner("이미지의 메시지를 해석하는 중..."):
+                st.session_state.img_meaning = ask_gemini(f"이 추상적인 이미지({img_url})가 본부장님의 확언과 어떤 연결고리가 있는지 희망적으로 해석해줘.")
+        
+        # 해석 텍스트 표시
+        st.info(f"💡 **Image Message**: {st.session_state.img_meaning}")
         
         if st.button("🎉 다이어리 최종 완성 (저장)"):
             new_row = pd.DataFrame([{
                 "날짜": datetime.now().strftime('%Y-%m-%d'),
                 "감사1": st.session_state.g_data[0], "감사2": st.session_state.g_data[1], "감사3": st.session_state.g_data[2],
                 "확언1": st.session_state.a_data[0], "확언2": st.session_state.a_data[1], "확언3": st.session_state.a_data[2],
-                "사진여부": "Yes", "이미지URL": img_url, "의미": "Daily Miracle"
+                "사진여부": "Yes", "이미지URL": img_url, 
+                "의미": st.session_state.img_meaning # 해석된 의미 저장
             }])
             try:
                 # 저장 로직
@@ -166,15 +132,16 @@ with tab1:
                 updated_df = pd.concat([current_df, new_row], ignore_index=True)
                 conn.update(worksheet="Sheet1", data=updated_df)
                 
-                # 🎈 풍선이 뜰 시간을 확보합니다 (2초 대기)
+                # 풍선 대기
                 st.balloons()
                 time.sleep(2) 
                 
-                # 초기화 및 리셋
+                # 초기화
                 st.cache_data.clear()
                 st.session_state.step = 1
                 st.session_state.cal_key += 1
-                for k in ['g_comment', 'a_comment', 'img_seed', 'g_data', 'a_data']:
+                # 모든 세션 데이터 삭제
+                for k in ['g_comment', 'a_comment', 'img_seed', 'g_data', 'a_data', 'img_meaning']:
                     if k in st.session_state: del st.session_state[k]
                 st.rerun()
             except Exception as e:
@@ -194,29 +161,25 @@ with tab2:
     df = get_data()
 
     if not df.empty:
-        # 달력 이벤트 (점 형태로 깔끔하게)
+        # 달력 이벤트
         events = []
         for _, row in df.iterrows():
             events.append({
-                "title": "", # 제목을 비워서 점만 나오게 함
+                "title": "", 
                 "start": row["날짜"],
                 "end": row["날짜"],
-                "display": "list-item", # 점 형태로 표시
+                "display": "list-item",
                 "backgroundColor": "#FF6B6B",
                 "borderColor": "#FF6B6B"
             })
         
-        # 커스텀 달력 렌더링
         cal = calendar(
             events=events, 
             options={
                 "headerToolbar": {"left": "prev,next", "center": "title", "right": "dayGridMonth"},
                 "initialView": "dayGridMonth",
                 "height": 650,
-                "navLinks": False,
-                "selectable": True,
-                "selectMirror": True,
-                "dayMaxEvents": True
+                "navLinks": False, "selectable": True, "selectMirror": True, "dayMaxEvents": True
             },
             custom_css="""
                 .fc-event-title { display: none; } 
@@ -237,5 +200,8 @@ with tab2:
                 with c2:
                     st.success(f"**🔥 확언**\n\n1. {target.iloc[0]['확언1']}\n2. {target.iloc[0]['확언2']}\n3. {target.iloc[0]['확언3']}")
                 st.image(target.iloc[0]['이미지URL'], use_container_width=True)
+                # 저장된 이미지 의미 표시
+                if "의미" in target.columns:
+                    st.warning(f"💡 **Image Message**: {target.iloc[0]['의미']}")
     else:
         st.info("아직 기록이 없습니다. 오늘부터 기적을 쌓아보세요!")

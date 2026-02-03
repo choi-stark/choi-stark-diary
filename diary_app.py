@@ -28,29 +28,17 @@ else:
     st.error("Secrets에 'gemini_api_key'를 설정해주세요.")
     st.stop()
 
-# 최신 데이터를 읽어오는 함수 (에러 방지 강화)
 def get_data():
     try:
+        # worksheet 이름을 "Sheet1"으로 고정하고 캐시를 제거합니다.
         return conn.read(worksheet="Sheet1", ttl=0)
-    except Exception as e:
-        # 에러 발생 시 사용자에게 안내하고 빈 데이터를 반환합니다.
-        st.error(f"⚠️ 시트 연결 오류: {e}")
-        return pd.DataFrame(columns=["날짜", "감사1", "감사2", "감사3", "확언1", "확언2", "확언3", "이미지URL", "의미"])
+    except:
+        return pd.DataFrame(columns=["날짜", "감사1", "감사2", "감사3", "확언1", "확언2", "확언3", "사진여부", "이미지URL", "의미"])
 
-# 앱 시작 시 데이터 로드
 df = get_data()
 
-def ask_gemini(prompt):
-    system_instruction = "당신은 인생 멘토입니다. 매우 단호하고 확신에 차 있어야 하며, 2~3문장의 결의 메시지를 작성하세요."
-    try:
-        response = model.generate_content(f"{system_instruction}\n\n내용: {prompt}")
-        return response.text
-    except:
-        return "당신의 의지가 현실을 창조합니다. 오늘 하루를 당신의 것으로 만드십시오."
-
-# 세션 상태 초기화
+# 세션 상태 초기화 (사진 고정용)
 if 'step' not in st.session_state: st.session_state.step = 1
-# --- 사진 고정을 위한 시드값 초기화 ---
 if 'img_seed' not in st.session_state: st.session_state.img_seed = random.randint(1, 9999)
 
 tab1, tab2 = st.tabs(["오늘의 일기작성", "지난 기록"])
@@ -62,97 +50,39 @@ with tab1:
         g1 = st.text_input("오늘 감사한 일 1", key="g1")
         g2 = st.text_input("오늘 감사한 일 2", key="g2")
         g3 = st.text_input("오늘 감사한 일 3", key="g3")
-        
         if st.button("제출"):
             if g1 and g2 and g3:
-                with st.spinner('신의 신호를 읽어오는 중...'):
-                    st.session_state.g_quote = ask_gemini(f"감사: {g1}, {g2}, {g3}")
                 st.session_state.g_data = [g1, g2, g3]
                 st.session_state.step = 2
                 st.rerun()
 
     elif st.session_state.step == 2:
-        st.success(f"✨ 오늘의 메시지: {st.session_state.g_quote}")
         st.header("✨ 2단계: 확언일기 작성")
         a1 = st.text_input("강력한 확언 1", key="a1")
         a2 = st.text_input("강력한 확언 2", key="a2")
         a3 = st.text_input("강력한 확언 3", key="a3")
-
         if st.button("제출 "):
             if a1 and a2 and a3:
-                with st.spinner('우주의 확신을 가져오는 중...'):
-                    st.session_state.a_quote = ask_gemini(f"확언: {a1}, {a2}, {a3}")
                 st.session_state.a_data = [a1, a2, a3]
                 st.session_state.step = 3
                 st.rerun()
 
     elif st.session_state.step == 3:
         st.header("🎁 우주의 응답")
-        st.info(f"💫 확신 멘트: {st.session_state.a_quote}")
-        
-        # --- 세션 시드값을 사용하여 사진을 한 장으로 고정 ---
         img_url = f"https://picsum.photos/seed/{st.session_state.img_seed}/1200/600"
         st.image(img_url, use_container_width=True)
         
         if 'meaning' not in st.session_state:
-            st.session_state.meaning = ask_gemini(f"이 사진({img_url})의 의미를 본부장님의 결의와 연결해 한 줄로 설명해줘.")
-        st.write(f"💡 이미지의 의미: {st.session_state.meaning}")
+            with st.spinner('메시지를 생성 중입니다...'):
+                prompt = f"이 사진({img_url})의 의미를 본부장님의 일기와 연결해 한 줄로 설명해줘."
+                st.session_state.meaning = model.generate_content(prompt).text
+        st.info(f"💡 이미지의 의미: {st.session_state.meaning}")
         
         if st.button("최종 기록 제출"):
+            # 시트의 헤더(날짜~의미)와 순서를 완벽히 맞춘 데이터 생성
             new_entry = pd.DataFrame([{
                 "날짜": datetime.now().strftime('%Y-%m-%d'),
                 "감사1": st.session_state.g_data[0], "감사2": st.session_state.g_data[1], "감사3": st.session_state.g_data[2],
                 "확언1": st.session_state.a_data[0], "확언2": st.session_state.a_data[1], "확언3": st.session_state.a_data[2],
-                "이미지URL": img_url, "의미": st.session_state.meaning
-            }])
-            
-            try:
-                current_df = get_data()
-                updated_df = pd.concat([current_df, new_entry], ignore_index=True)
-                conn.update(worksheet="Sheet1", data=updated_df)
-                st.balloons()
-                st.session_state.step = 1
-                # 다음 일기를 위해 사진 시드값 초기화
-                del st.session_state.img_seed
-                del st.session_state.meaning
-                st.cache_data.clear()
-                st.rerun()
-            except Exception as e:
-                st.error(f"저장 중 오류가 발생했습니다: {e}")
-
-# ---------------- Tab 2: 지난 기록 ----------------
-with tab2:
-    st.header("📅 지난 결의 기록")
-    
-    if st.button("🔄 기록 새로고침"):
-        st.cache_data.clear()
-        st.rerun()
-
-    if df.empty or len(df) == 0:
-        st.info("기록된 일기가 없습니다. 첫 일기를 작성해 보세요!")
-    else:
-        calendar_events = []
-        for _, row in df.iterrows():
-            calendar_events.append({
-                "title": "●",
-                "start": str(row["날짜"]),
-                "end": str(row["날짜"]),
-                "display": "background",
-                "color": "rgba(255, 0, 0, 0.4)"
-            })
-
-        state = calendar(
-            events=calendar_events, 
-            options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth"}, "initialView": "dayGridMonth", "height": 700}, 
-            key='miracle_calendar_fixed'
-        )
-        
-        if state.get("callback") == "dateClick":
-            clicked_date = state["dateClick"]["dateStr"]
-            day_data = df[df["날짜"] == clicked_date]
-            if not day_data.empty:
-                st.markdown(f"---")
-                st.markdown(f"### 🗓️ {clicked_date}의 기록")
-                st.write(f"🙏 감사: {day_data.iloc[0]['감사1']}, {day_data.iloc[0]['감사2']}, {day_data.iloc[0]['감사3']}")
-                st.write(f"✨ 확언: {day_data.iloc[0]['확언1']}, {day_data.iloc[0]['확언2']}, {day_data.iloc[0]['확언3']}")
-                st.image(day_data.iloc[0]['이미지URL'])
+                "사진여부": "Yes", # 시트의 사진여부 칸을 채웁니다.
+                "이미지URL": img_url,

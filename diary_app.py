@@ -85,4 +85,32 @@ with tab1:
                 "감사1": st.session_state.g_data[0], "감사2": st.session_state.g_data[1], "감사3": st.session_state.g_data[2],
                 "확언1": st.session_state.a_data[0], "확언2": st.session_state.a_data[1], "확언3": st.session_state.a_data[2],
                 "사진여부": "Yes", # 시트의 사진여부 칸을 채웁니다.
-                "이미지URL": img_url,
+                "이미지URL": img_url, 
+                "의미": st.session_state.meaning
+            }])
+            
+            try:
+                current_df = get_data()
+                updated_df = pd.concat([current_df, new_entry], ignore_index=True)
+                conn.update(worksheet="Sheet1", data=updated_df)
+                st.balloons()
+                st.session_state.step = 1
+                del st.session_state.img_seed
+                if 'meaning' in st.session_state: del st.session_state.meaning
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                st.error(f"저장 실패! 시트의 헤더 순서나 이름을 확인해 주세요. (에러: {e})")
+
+# ---------------- Tab 2: 지난 기록 ----------------
+with tab2:
+    st.header("📅 지난 결의 기록")
+    if st.button("🔄 기록 새로고침"):
+        st.cache_data.clear()
+        st.rerun()
+
+    if df.empty:
+        st.info("아직 기록된 일기가 없습니다.")
+    else:
+        calendar_events = [{"title": "●", "start": str(row["날짜"]), "end": str(row["날짜"]), "display": "background", "color": "rgba(255, 0, 0, 0.4)"} for _, row in df.iterrows()]
+        calendar(events=calendar_events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth"}, "initialView": "dayGridMonth", "height": 700}, key='miracle_calendar_final')
